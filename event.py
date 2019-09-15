@@ -89,5 +89,5 @@ class Event:
         self.observers[:] = [observer for observer in self.observers if observer is not None]
 
 
-class DuplicateObserver(RuntimeError):
+class DuplicateObserver(Exception):
     pass
