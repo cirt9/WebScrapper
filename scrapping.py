@@ -4,127 +4,102 @@ import random
 
 import requests
 from bs4 import BeautifulSoup
+import IPy
 
 import event
+import debug
 
 
 class Scrapper(event.Subject):
-    PROXY_URL = 'https://free-proxy-list.net/'
-    PROXY_FILE_NAME = r'files/proxy.txt'
-    USER_AGENTS_FILE_NAME = r'files/user_agents.txt'
 
-    def __init__(self, min_delay=350, max_delay=1000, max_proxy_timeouts=3, max_read_failure=3, timeout=6.03):
-        event.Subject.__init__(self)
+    def __init__(self, min_delay=334, max_delay=500, timeout=3.03):
+        super().__init__()
 
         self.min_delay = min_delay
         self.max_delay = max_delay
         self.previous_tick_time = datetime.datetime.now() - datetime.timedelta(milliseconds=self.max_delay)
         self.next_delay = 0
         self.timeout = timeout
-        self.stealth_mode = False
-        self.used_proxy_index = -1
-        self.proxy = []
-        self.used_user_agent_index = -1
-        self.user_agents = []
-        self.max_proxy_timeouts = max_proxy_timeouts
-        self.max_read_failure = max_read_failure
-        self.read_failure_counter = 0
+
+        self.max_connect_timeout = 3
+        self.connect_timeout_counter = 0
+        self.max_read_timeout = 3
+        self.read_timeout_counter = 0
+        self.max_connection_error = 3
+        self.connection_error_counter = 0
 
     @property
-    def stealth_mode(self):
-        return self.__stealth_mode
+    def min_delay(self):
+        return self.__min_delay
 
-    @stealth_mode.setter
-    def stealth_mode(self, state):
-        self.__stealth_mode = state
-        self.stealth_mode_changed(self.stealth_mode)
+    @min_delay.setter
+    def min_delay(self, min_delay):
+        if min_delay > 0:
+            self.__min_delay = min_delay
+        else:
+            self.__min_delay = 1
 
-    def refresh_stealth(self):
-        self.refresh_proxy()
-        self.refresh_user_agents()
+    @property
+    def max_delay(self):
+        return self.__max_delay
 
-    def refresh_proxy(self):
-        self.disable_stealth_mode()
-        self.used_proxy_index = -1
-        self.proxy = self.provide_proxy()
-        self.enable_stealth_mode(False)
+    @max_delay.setter
+    def max_delay(self, max_delay):
+        if max_delay > self.min_delay:
+            self.__max_delay = max_delay
+        else:
+            self.__max_delay = self.min_delay + 1
 
-    def refresh_user_agents(self):
-        self.used_user_agent_index = -1
-        self.user_agents = self.provide_user_agents()
+    @property
+    def timeout(self):
+        return self.__timeout
 
-    def enable_stealth_mode(self, refresh_stealth=True):
-        if not self.stealth_mode:
-            self.stealth_mode = True
+    @timeout.setter
+    def timeout(self, timeout):
+        if timeout <= 0.0:
+            self.__timeout = 0.0
+        else:
+            self.__timeout = timeout
 
-            if refresh_stealth:
-                self.refresh_stealth()
+    @property
+    def max_connect_timeout(self):
+        return self.__max_connect_timeout
 
-    def disable_stealth_mode(self):
-        if self.stealth_mode:
-            self.stealth_mode = False
+    @max_connect_timeout.setter
+    def max_connect_timeout(self, max_connect_timeout):
+        if max_connect_timeout < 0.1:
+            self.__max_connect_timeout = 0.1
+        else:
+            self.__max_connect_timeout = max_connect_timeout
 
-    def provide_proxy(self):
-        try:
-            proxy_list = self.provide_proxy_from_file()
-        except FileNotFoundError:
-            proxy_list = self.provide_proxy_from_web()
+    @property
+    def max_read_timeout(self):
+        return self.__max_read_timeout
 
-        return proxy_list
+    @max_read_timeout.setter
+    def max_read_timeout(self, max_read_timeout):
+        if max_read_timeout < 1:
+            self.__max_read_timeout = 1
+        else:
+            self.__max_read_timeout = max_read_timeout
 
-    def provide_proxy_from_file(self):
-        proxy_list = []
+    @property
+    def max_connection_error(self):
+        return self.__max_connection_error
 
-        with open(Scrapper.PROXY_FILE_NAME, 'r') as proxy_file:
-            for line in proxy_file.read().splitlines():
-                proxy_data = line.split(';')
-                proxy_list.append(Proxy(proxy_data[0], proxy_data[1]))
+    @max_connection_error.setter
+    def max_connection_error(self, max_connection_error):
+        if max_connection_error < 1:
+            self.__max_connection_error = 1
+        else:
+            self.__max_connection_error = max_connection_error
 
-        return proxy_list
-
-    def provide_proxy_from_web(self):
-        proxy_list = []
-        proxy_soup = self.scrape(self.PROXY_URL, False)
-
-        for item in proxy_soup.select('tbody tr'):
-            proxy = ':'.join([item.text for item in item.select('td')[:2]])
-            protocol = 'http' if item.select('td')[6].text == 'no' else 'https'
-            proxy_list.append(Proxy(protocol, proxy))
-
-        return proxy_list
-
-    def provide_user_agents(self):
-        try:
-            user_agents = self.provide_user_agents_from_file()
-        except FileNotFoundError:
-            raise RuntimeError('User agents file does not exist.')
-
-        return user_agents
-
-    def provide_user_agents_from_file(self):
-        user_agents = []
-
-        with open(Scrapper.USER_AGENTS_FILE_NAME, 'r') as user_agents_file:
-            for line in user_agents_file.read().splitlines():
-                user_agents.append(line)
-
-        return user_agents
-
-    def scrape(self, url, stealth_mode=None, switch_stealth=True):
+    def scrape(self, url):
         self.delay()
-
-        stealth_mode = stealth_mode if stealth_mode is not None else self.stealth_mode
-        protocol = url[0:url.find(':')]
-        session = requests.Session()
-
-        if stealth_mode:
-            self.prepare_stealth(session, protocol, switch_stealth)
-
-        source = self.get_source(url, session, protocol, stealth_mode)
-        soup = BeautifulSoup(source.text, features="html.parser")
+        source = self.get_source(url)
         self.update_delay_times()
 
-        return soup
+        return source
 
     def delay(self):
         elapsed_time = int(round((datetime.datetime.now().timestamp() - self.previous_tick_time.timestamp()) * 1000))
@@ -137,50 +112,207 @@ class Scrapper(event.Subject):
         self.previous_tick_time = datetime.datetime.now()
         self.next_delay = random.randint(self.min_delay, self.max_delay)
 
-    def prepare_stealth(self, session, protocol, switch_stealth):
-        if switch_stealth or not (self.used_proxy_index >= 0 and self.used_user_agent_index >= 0):
+    def get_source(self, url):
+        while True:
+            try:
+                source = requests.get(url, timeout=self.timeout)
+                source.encoding = 'utf-8'
+                self.reset_error_counters('connect_timeout_counter', 'read_timeout_counter', 'connection_error_counter')
+                return BeautifulSoup(source.text, features="html.parser")
+            except requests.exceptions.ConnectTimeout:
+                self.handle_connect_timeout()
+            except requests.ReadTimeout:
+                self.handle_read_timeout()
+            except requests.exceptions.SSLError:
+                self.handle_ssl_error(url)
+            except requests.ConnectionError:
+                self.handle_connection_error()
+
+    def handle_connect_timeout(self):
+        self.connect_timeout_counter += 1
+        self.connect_timeout(f'{self.connect_timeout_counter}/{self.max_connect_timeout}')
+
+        if self.connect_timeout_counter >= self.max_connect_timeout:
+            self.reset_error_counters('connect_timeout_counter')
+            raise ConnectTimeout()
+
+    def handle_read_timeout(self):
+        self.read_timeout_counter += 1
+        self.connect_timeout(f'{self.read_timeout_counter}/{self.max_read_timeout}')
+
+        if self.read_timeout_counter >= self.max_read_timeout:
+            self.reset_error_counters('read_timeout_counter')
+            raise ReadTimeout()
+
+    def handle_ssl_error(self, url):
+        raise SSLError(url)
+
+    def handle_connection_error(self):
+        self.connection_error_counter += 1
+        self.connection_error(f'{self.connection_error_counter}/{self.max_connection_error}')
+
+        if self.connection_error_counter >= self.max_connection_error:
+            self.reset_error_counters('connection_error_counter')
+            raise ConnectionErrorOccurred()
+
+    def reset_error_counters(self, *args):
+        for counter_name in args:
+            try:
+                self.__getattribute__(counter_name)
+            except AttributeError as e:
+                raise e
+            else:
+                self.__setattr__(counter_name, 0)
+
+    @event.signal
+    def connect_timeout(self, timeout_info):
+        pass
+
+    @event.signal
+    def read_timeout(self, timeout_info):
+        pass
+
+    @event.signal
+    def connection_error(self, error_info):
+        pass
+
+
+class StealthScrapper(Scrapper):
+    PROXY_URL = 'https://free-proxy-list.net/'
+    PROXY_FILE_DIR = r'files/proxy.txt'
+    USER_AGENTS_FILE_DIR = r'files/user_agents.txt'
+    WRONG_INDEX = -1
+
+    def __init__(self, min_delay=334, max_delay=500, timeout=3.03, proxy_from_file=False):
+        super().__init__(min_delay, max_delay, timeout)
+
+        self.proxy_from_file = proxy_from_file
+        self.used_proxy_index = StealthScrapper.WRONG_INDEX
+        self.proxy = []
+        self.used_user_agent_index = StealthScrapper.WRONG_INDEX
+        self.user_agents = []
+        self.max_proxy_ssl_error = 5
+        self.proxy_ssl_error_counter = 0
+
+    @property
+    def max_proxy_ssl_error(self):
+        return self.__max_proxy_ssl_error
+
+    @max_proxy_ssl_error.setter
+    def max_proxy_ssl_error(self, max_proxy_ssl_error):
+        if max_proxy_ssl_error < 1:
+            self.__max_proxy_ssl_error = 1
+        else:
+            self.__max_proxy_ssl_error = max_proxy_ssl_error
+
+    def scrape(self, url, change_stealth=True):
+        self.renew_stealth()
+
+        protocol = url[0:url.find(':')]
+        session = requests.Session()
+        self.prepare_stealth_session(session, protocol, change_stealth)
+
+        self.delay()
+        source = self.get_source(url, session, protocol)
+        self.update_delay_times()
+
+        return source
+
+    def renew_stealth(self):
+        if len(self.proxy) == 0:
+            self.refresh_proxy()
+        if len(self.user_agents) == 0:
+            self.refresh_user_agents()
+
+    def refresh_stealth(self):
+        self.refresh_proxy()
+        self.refresh_user_agents()
+
+    def refresh_proxy(self):
+        self.used_proxy_index = StealthScrapper.WRONG_INDEX
+        self.provide_proxy()
+
+    def refresh_user_agents(self):
+        self.used_user_agent_index = StealthScrapper.WRONG_INDEX
+        self.provide_user_agents()
+
+    def provide_proxy(self):
+        if self.proxy_from_file:
+            self.provide_proxy_from_file()
+        else:
+            self.provide_proxy_from_web()
+
+    def provide_proxy_from_file(self):
+        self.proxy.clear()
+
+        with open(StealthScrapper.PROXY_FILE_DIR, 'r') as proxy_file:
+            for line in proxy_file.read().splitlines():
+                proxy_data = line.split(';')
+                protocol = proxy_data[0]
+                ip = proxy_data[1]
+                port = proxy_data[2]
+
+                if Proxy.is_valid(protocol, ip, int(port)):
+                    self.proxy.append(Proxy(protocol, ip, int(port)))
+
+    def provide_proxy_from_web(self):
+        self.proxy.clear()
+        proxy_source = Scrapper.scrape(super(), StealthScrapper.PROXY_URL)
+
+        try:
+            self.extract_proxy_from_source(proxy_source)
+        except Exception as e:
+            raise ProxyScrappingError(debug.debug_info(repr(e)))
+
+        if len(self.proxy) == 0:
+            raise ProxyScrappingError(debug.debug_info('Proxy list is empty'))
+
+    def extract_proxy_from_source(self, proxy_source):
+        for item in proxy_source.select('tbody tr'):
+            if len(item.select('td')) > 6:
+                ip = item.select('td')[0].text
+                port = item.select('td')[1].text
+                protocol = Proxy.HTTP if item.select('td')[6].text == 'no' else Proxy.HTTPS
+
+                if Proxy.is_valid(protocol, ip, int(port)):
+                    self.proxy.append(Proxy(protocol, ip, int(port)))
+
+    def provide_user_agents(self):
+        self.user_agents.clear()
+
+        with open(StealthScrapper.USER_AGENTS_FILE_DIR, 'r') as user_agents_file:
+            for line in user_agents_file.read().splitlines():
+                self.user_agents.append(line)
+
+    def prepare_stealth_session(self, session, protocol, change_stealth):
+        if change_stealth or self.stealth_change_required():
             self.draw_proxy(protocol)
             self.draw_user_agent()
 
-        session.proxies = {self.proxy[self.used_proxy_index].protocol: self.proxy[self.used_proxy_index].address}
+        session.proxies = {self.proxy[self.used_proxy_index].protocol: self.proxy[self.used_proxy_index].address()}
         session.headers = {'User-Agent': self.user_agents[self.used_user_agent_index]}
 
-    def get_source(self, url, session, protocol, stealth_mode):
-        while True:
-            try:
-                source = session.get(url, timeout=self.timeout)
-                source.encoding = 'utf-8'
-                self.reset_read_failure_counter()
-                return source
-            except requests.exceptions.ConnectTimeout as exception:
-                if stealth_mode:
-                    self.handle_connect_timeout(session, protocol)
-                else:
-                    raise exception
-            except (requests.exceptions.ProxyError, requests.exceptions.SSLError):
-                self.handle_proxy_error(session, protocol)
-            except requests.exceptions.InvalidHeader:
-                self.handle_invalid_header(session)
-            except requests.ReadTimeout:
-                self.handle_read_timeout()
+    def stealth_change_required(self):
+        return self.used_proxy_index == StealthScrapper.WRONG_INDEX or \
+               self.used_user_agent_index == StealthScrapper.WRONG_INDEX
 
     def draw_proxy(self, protocol):
         protocol_proxy_indexes = [i for i, x in enumerate(self.proxy) if x.protocol == protocol]
 
         if len(protocol_proxy_indexes) == 0:
-            self.lack_of_proxy(protocol)
+            raise LackOfProxy(protocol)
         elif len(protocol_proxy_indexes) == 1:
-            self.used_proxy_index = 0
+            self.used_proxy_index = protocol_proxy_indexes[0]
         else:
             previous_proxy_index = self.used_proxy_index
             while self.used_proxy_index == previous_proxy_index:
                 self.used_proxy_index = random.choice(protocol_proxy_indexes)
 
-        return {self.proxy[self.used_proxy_index].protocol: self.proxy[self.used_proxy_index].address}
+        return {self.proxy[self.used_proxy_index].protocol: self.proxy[self.used_proxy_index].address()}
 
     def draw_user_agent(self):
         if len(self.user_agents) == 0:
-            self.lack_of_user_agent()
+            raise LackOfUserAgents()
         elif len(self.user_agents) == 1:
             self.used_user_agent_index = 0
         else:
@@ -190,36 +322,97 @@ class Scrapper(event.Subject):
 
         return {'User-Agent': self.user_agents[self.used_user_agent_index]}
 
-    def handle_connect_timeout(self, session, protocol):
-        self.proxy[self.used_proxy_index].increment_timeout()
-        self.proxy_connect_timeout(str(self.proxy[self.used_proxy_index]))
+    def get_source(self, url, session, protocol):
+        while True:
+            try:
+                source = session.get(url, timeout=self.timeout)
+                source.encoding = 'utf-8'
+                self.reset_error_counters('connect_timeout_counter', 'read_timeout_counter', 'connection_error_counter',
+                                          'proxy_ssl_error_counter')
+                return BeautifulSoup(source.text, features="html.parser")
+            except requests.exceptions.ConnectTimeout:
+                self.handle_connect_timeout(session, protocol)
+            except requests.exceptions.ProxyError:
+                self.handle_proxy_error(session, protocol)
+            except requests.exceptions.InvalidHeader:
+                self.handle_invalid_header(session)
+            except requests.ReadTimeout:
+                self.handle_read_timeout(session, protocol)
+            except requests.exceptions.SSLError:
+                self.handle_ssl_error(url, session, protocol)
+            except requests.exceptions.ConnectionError:
+                self.handle_connection_error(session, protocol)
 
-        if self.proxy[self.used_proxy_index].timeout_counter == self.max_proxy_timeouts:
+    def handle_connect_timeout(self, session, protocol):
+        self.connect_timeout_counter += 1
+        self.proxy_connect_timeout(f'{str(self.proxy[self.used_proxy_index])} '
+                                   f'{self.connect_timeout_counter}/{self.max_connect_timeout}')
+
+        if self.connect_timeout_counter >= self.max_connect_timeout:
+            self.reset_error_counters('connect_timeout_counter', 'read_timeout_counter', 'connection_error_counter',
+                                      'proxy_ssl_error_counter')
             self.remove_proxy(self.used_proxy_index)
-        session.proxies = self.draw_proxy(protocol)
+            session.proxies = self.draw_proxy(protocol)
 
     def handle_proxy_error(self, session, protocol):
         self.proxy_error(str(self.proxy[self.used_proxy_index]))
         self.remove_proxy(self.used_proxy_index)
+        self.reset_error_counters('connect_timeout_counter', 'read_timeout_counter', 'connection_error_counter',
+                                  'proxy_ssl_error_counter')
         session.proxies = self.draw_proxy(protocol)
 
     def handle_invalid_header(self, session):
         self.invalid_user_agent(self.user_agents[self.used_user_agent_index])
         self.remove_user_agent(self.used_user_agent_index)
+        self.reset_error_counters('connect_timeout_counter', 'read_timeout_counter', 'connection_error_counter',
+                                  'proxy_ssl_error_counter')
         session.headers = self.draw_user_agent()
 
-    def handle_read_timeout(self):
-        self.read_failure_counter += 1
-        if self.read_failure_counter == self.max_read_failure:
-            raise requests.ReadTimeout()
+    def handle_read_timeout(self, session, protocol):
+        self.read_timeout_counter += 1
+        self.proxy_read_timeout(f'{self.read_timeout_counter}/{self.max_read_timeout}')
 
-        self.read_failure(f'{self.read_failure_counter}/{self.max_read_failure}')
+        if self.read_timeout_counter >= self.max_read_timeout:
+            self.reset_error_counters('connect_timeout_counter', 'read_timeout_counter', 'connection_error_counter',
+                                      'proxy_ssl_error_counter')
+            raise ProxyReadTimeout()
+
+        self.reset_error_counters('connect_timeout_counter', 'connection_error_counter', 'proxy_ssl_error_counter')
+        self.remove_proxy(self.used_proxy_index)
+        session.proxies = self.draw_proxy(protocol)
+
+    def handle_ssl_error(self, url, session, protocol):
+        self.proxy_ssl_error_counter += 1
+        self.proxy_ssl_error(f'{str(self.proxy[self.used_proxy_index])} {self.proxy_ssl_error_counter}/'
+                             f'{self.max_proxy_ssl_error}', url)
+
+        if self.proxy_ssl_error_counter >= self.max_proxy_ssl_error:
+            self.reset_error_counters('connect_timeout_counter', 'read_timeout_counter', 'connection_error_counter',
+                                      'proxy_ssl_error_counter')
+            raise ProxySSLError()
+
+        self.reset_error_counters('connect_timeout_counter', 'read_timeout_counter', 'connection_error_counter')
+        self.remove_proxy(self.used_proxy_index)
+        session.proxies = self.draw_proxy(protocol)
+
+    def handle_connection_error(self, session, protocol):
+        self.connection_error_counter += 1
+        self.proxy_connection_error(f'{self.connection_error_counter}/{self.max_connection_error}')
+
+        if self.connection_error_counter >= self.max_connection_error:
+            self.reset_error_counters('connect_timeout_counter', 'read_timeout_counter', 'connection_error_counter',
+                                      'proxy_ssl_error_counter')
+            raise ProxyConnectionError()
+
+        self.reset_error_counters('connect_timeout_counter', 'read_timeout_counter', 'proxy_ssl_error_counter')
+        self.remove_proxy(self.used_proxy_index)
+        session.proxies = self.draw_proxy(protocol)
 
     def remove_proxy(self, index):
         del self.proxy[index]
 
         if index == self.used_proxy_index:
-            self.used_proxy_index = -1
+            self.used_proxy_index = StealthScrapper.WRONG_INDEX
 
         if len(self.proxy) == 0:
             self.proxy_exhausted()
@@ -228,17 +421,10 @@ class Scrapper(event.Subject):
         del self.user_agents[index]
 
         if index == self.used_user_agent_index:
-            self.used_user_agent_index = -1
+            self.used_user_agent_index = StealthScrapper.WRONG_INDEX
 
         if len(self.user_agents) == 0:
             self.user_agents_exhausted()
-
-    def reset_read_failure_counter(self):
-        self.read_failure_counter = 0
-
-    @event.signal
-    def stealth_mode_changed(self, state):
-        pass
 
     @event.signal
     def proxy_connect_timeout(self, proxy_info):
@@ -253,19 +439,19 @@ class Scrapper(event.Subject):
         pass
 
     @event.signal
-    def read_failure(self, counter):
+    def proxy_read_timeout(self, info):
         pass
 
     @event.signal
-    def lack_of_proxy(self, protocol):
+    def proxy_ssl_error(self, proxy_info, url):
+        pass
+
+    @event.signal
+    def proxy_connection_error(self, info):
         pass
 
     @event.signal
     def proxy_exhausted(self):
-        pass
-
-    @event.signal
-    def lack_of_user_agent(self):
         pass
 
     @event.signal
@@ -274,23 +460,99 @@ class Scrapper(event.Subject):
 
 
 class Proxy:
+    HTTP = 'http'
+    HTTPS = 'https'
+    MIN_PORT = 0
+    MAX_PORT = 65535
 
-    def __init__(self, protocol='', address=''):
+    def __init__(self, protocol, ip, port):
         self.protocol = protocol
-        self.address = address
-        self.timeout_counter = 0
-
-    def increment_timeout(self):
-        self.timeout_counter += 1
-
-    def __eq__(self, other):
-        return self.protocol == other.protocol and self.address == other.address
+        self.ip = ip
+        self.port = port
 
     def __repr__(self):
-        return self.protocol + ': ' + self.address
-
-    def __bool__(self):
-        return len(self.protocol) > 0 and len(self.address) > 0
+        return f'{self.protocol}://{self.ip}:{self.port}'
 
     def __str__(self):
-        return f'Proxy: {self.protocol}://{self.address}, Timeout counter: {self.timeout_counter}'
+        return f'{self.protocol}://{self.ip}:{self.port}'
+
+    def address(self):
+        return f'{self.ip}:{self.port}'
+
+    @staticmethod
+    def is_valid(protocol, ip, port):
+        if Proxy.protocol_valid(protocol) and Proxy.ip_valid(ip) and Proxy.port_valid(port):
+            return True
+        return False
+
+    @staticmethod
+    def protocol_valid(protocol):
+        if protocol in (Proxy.HTTP, Proxy.HTTPS):
+            return True
+        return False
+
+    @staticmethod
+    def ip_valid(ip):
+        try:
+            IPy.IP(ip)
+            return True
+        except ValueError:
+            return False
+
+    @staticmethod
+    def port_valid(port):
+        if Proxy.MIN_PORT <= port <= Proxy.MAX_PORT:
+            return True
+        return False
+
+
+class ScrappingException(Exception):
+    pass
+
+
+class NormalScrappingException(ScrappingException):
+    pass
+
+
+class StealthScrappingException(ScrappingException):
+    pass
+
+
+class ConnectTimeout(NormalScrappingException):
+    pass
+
+
+class ReadTimeout(NormalScrappingException):
+    pass
+
+
+class ConnectionErrorOccurred(NormalScrappingException):
+    pass
+
+
+class SSLError(NormalScrappingException):
+    pass
+
+
+class ProxyReadTimeout(StealthScrappingException):
+    pass
+
+
+class ProxySSLError(StealthScrappingException):
+    pass
+
+
+class ProxyConnectionError(StealthScrappingException):
+    pass
+
+
+class LackOfProxy(StealthScrappingException):
+    pass
+
+
+class LackOfUserAgents(StealthScrappingException):
+    pass
+
+
+class ProxyScrappingError(StealthScrappingException):
+    pass
