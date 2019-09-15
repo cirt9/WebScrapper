@@ -18,27 +18,30 @@ Proxy and user agent are changed every time when there is an error or when a scr
 # Event
 
 In order to use event system:
-1. your class have to derive from event.Subject,
-2. your class have to implement signal method like this one:
-
+1. Your class have to derive from event.Subject,
+2. Your class have to implement signal method like this one:
+```
     @event.signal
     def connect_timeout(self, timeout_info):
         pass
-
+```
 3. You have to invoke signal in one of your's class methods:
-
+```
     def invoke_connect_timeout(self):
         ...
         self.connect_timeout('TIMEOUT INFO')
-
+```
 4. You have to connect signal to a method or a function:
 -For a given method from scrapper_example.py:
-
+```
     def on_connect_timeout(self, timeout_info):
         self.logger.warning(f'Connect timeout: {timeout_info}')
-    
+```
 You have to connect it like this:
+```
     event.connect(scrapper, scrapper.connect_timeout, logger.on_connect_timeout)
-    
+```
 -If it would be a function instead of a method:
+```
     event.connect(scrapper, scrapper.connect_timeout, on_connect_timeout)
+```
