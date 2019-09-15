@@ -1,9 +1,9 @@
 # WebScrapper
 
 WebScrapper is a program developed in Python 3.7 which allows you to scrap a website. You can use Scrapper class to scrap with your ip/user-agent or StealthScrapper which uses proxy and different user agents. The program also implements simple event system similar to the one that is implemented in Qt. If you want to build this code you will need the following packages:
--IPy
--beautifulsoup4
--requests
+-IPy</br>
+-beautifulsoup4</br>
+-requests</br>
 
 
 # Scrapping
