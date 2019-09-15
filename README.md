@@ -9,7 +9,7 @@ Using Scrapper is fairly straightforward. You just have to use scrape method wit
 
 With StealthScrapper in default proxy is provided from the Internet, but you can change this by setting proxy_from_file parameter to True and provide proxy from files/proxy.txt. The format is like this:
 
-protocol;ip;port
+protocol;ip;port</br>
 https;190.13.14.34;8080
 
 Proxy and user agent are changed every time when there is an error or when a scrapping was successfull. But when invoking scrape method you can invoke it like this: scrapper.scrape(url, False). Program will retain a proxy and a user agent from a previous scrapping process and won't change it if it isn't needed.
