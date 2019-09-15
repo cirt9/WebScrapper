@@ -22,64 +22,62 @@ class ScrapperLogger:
     def log(self, msg, level=logging.INFO):
         self.logger.log(level, msg)
 
-    def on_stealth_mode_changed(self, state):
-        self.logger.info(f'Stealth mode state was changed to: {state}')
+    def on_connect_timeout(self, timeout_info):
+        self.logger.warning(f'Connect timeout: {timeout_info}')
+
+    def on_read_timeout(self, timeout_info):
+        self.logger.warning(f'Read timeout: {timeout_info}')
+
+    def on_connection_error(self, error_info):
+        self.logger.warning(f'Connection error: {error_info}')
 
     def on_proxy_connect_timeout(self, proxy_info):
-        self.logger.info(f'Proxy connection timeout: {proxy_info}')
+        self.logger.warning(f'Proxy connect timeout: {proxy_info}')
 
     def on_proxy_error(self, proxy_info):
         self.logger.warning(f'Proxy error: {proxy_info}')
 
     def on_invalid_user_agent(self, user_agent_info):
-        self.logger.info(f'Invalid user agent: {user_agent_info}')
+        self.logger.warning(f'Invalid user agent: {user_agent_info}')
 
-    def on_read_failure(self, info):
-        self.logger.warning(f'Read failure: {info}')
+    def on_proxy_read_timeout(self, info):
+        self.logger.warning(f'Proxy read timeout: {info}')
 
-    def on_lack_of_proxy(self, protocol):
-        self.logger.warning(f'Lack of proxy of {protocol} protocol')
+    def on_proxy_ssl_error(self, proxy_info, url):
+        self.logger.warning(f'Proxy SSL error: {proxy_info}, url: {url}')
+
+    def on_proxy_connection_error(self, info):
+        self.logger.warning(f'Proxy connection error: {info}')
 
     def on_proxy_exhausted(self):
         self.logger.warning('Proxy exhausted')
-
-    def on_lack_of_user_agent(self):
-        self.logger.warning('Lack of user agent')
 
     def on_user_agents_exhausted(self):
         self.logger.warning('User agents exhausted')
 
 
 def main():
-    url = 'https://www.google.com/'
-
-    scrapper = scrapping.Scrapper()
+    scrapper = scrapping.StealthScrapper()
     logger = ScrapperLogger()
 
-    event.connect(scrapper, scrapper.stealth_mode_changed, logger.on_stealth_mode_changed)
+    event.connect(scrapper, scrapper.connect_timeout, logger.on_connect_timeout)
+    event.connect(scrapper, scrapper.read_timeout, logger.on_read_timeout)
+    event.connect(scrapper, scrapper.connection_error, logger.on_connection_error)
+
     event.connect(scrapper, scrapper.proxy_connect_timeout, logger.on_proxy_connect_timeout)
     event.connect(scrapper, scrapper.proxy_error, logger.on_proxy_error)
     event.connect(scrapper, scrapper.invalid_user_agent, logger.on_invalid_user_agent)
-    event.connect(scrapper, scrapper.read_failure, logger.on_read_failure)
-
-    event.connect(scrapper, scrapper.lack_of_proxy, logger.on_lack_of_proxy)
+    event.connect(scrapper, scrapper.proxy_read_timeout, logger.on_proxy_read_timeout)
+    event.connect(scrapper, scrapper.proxy_ssl_error, logger.on_proxy_ssl_error)
+    event.connect(scrapper, scrapper.proxy_connection_error, logger.on_proxy_connection_error)
     event.connect(scrapper, scrapper.proxy_exhausted, logger.on_proxy_exhausted)
-    event.connect(scrapper, scrapper.lack_of_user_agent, logger.on_lack_of_user_agent)
     event.connect(scrapper, scrapper.user_agents_exhausted, logger.on_user_agents_exhausted)
 
-    scrapper.enable_stealth_mode()
-
     try:
-        soup = scrapper.scrape(url)
-        print(soup)
-    except scrapping.requests.ConnectTimeout as exception:
-        logger.log(f'Non proxy connect timeout: {type(exception).__name__}', logging.CRITICAL)
-    except scrapping.requests.ReadTimeout as exception:
-        logger.log(f'Read error, max failure exceeded: {type(exception).__name__}', logging.CRITICAL)
-    except scrapping.requests.ConnectionError as exception:
-        logger.log(type(exception).__name__, logging.CRITICAL)
-    except scrapping.requests.exceptions.RequestException as exception:
-        logger.log(f'Undefined requests error: {type(exception).__name__}', logging.CRITICAL)
+        source = scrapper.scrape(r'https://www.google.com/')
+        print(source)
+    except scrapping.ScrappingException as exception:
+        logger.log(f'Exception: {type(exception).__name__}', logging.CRITICAL)
 
 
 if __name__ == '__main__':
