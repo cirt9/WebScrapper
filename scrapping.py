@@ -127,6 +127,8 @@ class Scrapper(event.Subject):
                 self.handle_ssl_error(url)
             except requests.ConnectionError:
                 self.handle_connection_error()
+            except requests.exceptions.RequestException as e:
+                raise NormalScrappingException(f'Undefined requests error: {type(e).__name__}')
 
     def handle_connect_timeout(self):
         self.connect_timeout_counter += 1
