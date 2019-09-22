@@ -77,7 +77,7 @@ def main():
         source = scrapper.scrape(r'https://www.google.com/')
         print(source)
     except scrapping.ScrappingException as exception:
-        logger.log(f'Exception: {type(exception).__name__}', logging.CRITICAL)
+        logger.log(f'Exception: {str(exception)}', logging.CRITICAL)
 
 
 if __name__ == '__main__':
