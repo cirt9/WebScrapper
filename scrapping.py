@@ -128,7 +128,7 @@ class Scrapper(event.Subject):
             except requests.ConnectionError:
                 self.handle_connection_error()
             except requests.exceptions.RequestException as e:
-                raise NormalScrappingException(f'Undefined requests error: {type(e).__name__}')
+                raise NormalScrappingException(f'Undefined requests error: {str(e)}')
 
     def handle_connect_timeout(self):
         self.connect_timeout_counter += 1
@@ -345,7 +345,7 @@ class StealthScrapper(Scrapper):
             except requests.exceptions.ConnectionError:
                 self.handle_connection_error(session, protocol)
             except requests.exceptions.RequestException as e:
-                raise StealthScrappingException(f'Undefined requests error: {type(e).__name__}')
+                raise StealthScrappingException(f'Undefined requests error: {str(e)}')
 
     def handle_connect_timeout(self, session, protocol):
         self.connect_timeout_counter += 1
