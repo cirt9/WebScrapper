@@ -115,10 +115,11 @@ class Scrapper(event.Subject):
     def get_source(self, url):
         while True:
             try:
-                source = requests.get(url, timeout=self.timeout)
-                source.encoding = 'utf-8'
-                self.reset_error_counters('connect_timeout_counter', 'read_timeout_counter', 'connection_error_counter')
-                return BeautifulSoup(source.text, features="html.parser")
+                with requests.get(url, timeout=self.timeout) as source:
+                    source.encoding = 'utf-8'
+                    self.reset_error_counters('connect_timeout_counter', 'read_timeout_counter',
+                                              'connection_error_counter')
+                    return BeautifulSoup(source.text, features="html.parser")
             except requests.exceptions.ConnectTimeout:
                 self.handle_connect_timeout()
             except requests.ReadTimeout:
@@ -327,11 +328,11 @@ class StealthScrapper(Scrapper):
     def get_source(self, url, session, protocol):
         while True:
             try:
-                source = session.get(url, timeout=self.timeout)
-                source.encoding = 'utf-8'
-                self.reset_error_counters('connect_timeout_counter', 'read_timeout_counter', 'connection_error_counter',
-                                          'proxy_ssl_error_counter')
-                return BeautifulSoup(source.text, features="html.parser")
+                with session.get(url, timeout=self.timeout) as source:
+                    source.encoding = 'utf-8'
+                    self.reset_error_counters('connect_timeout_counter', 'read_timeout_counter',
+                                              'connection_error_counter', 'proxy_ssl_error_counter')
+                    return BeautifulSoup(source.text, features="html.parser")
             except requests.exceptions.ConnectTimeout:
                 self.handle_connect_timeout(session, protocol)
             except requests.exceptions.ProxyError:
