@@ -34,7 +34,7 @@ In order to use event system:
         ...
         self.connect_timeout('TIMEOUT INFO')
 ```
-4. You have to connect signal to a method or a function:
+4. You have to connect signal to a method or a function:</br>
 -For a given method from scrapper_example.py:
 ```
     def on_connect_timeout(self, timeout_info):
