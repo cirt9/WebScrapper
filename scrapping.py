@@ -27,6 +27,8 @@ class Scrapper(event.Subject):
         self.read_timeout_counter = 0
         self.max_connection_error = 3
         self.connection_error_counter = 0
+        self.max_chunked_encoding_error = 3
+        self.chunked_encoding_error_counter = 0
 
     @property
     def min_delay(self):
@@ -94,6 +96,17 @@ class Scrapper(event.Subject):
         else:
             self.__max_connection_error = max_connection_error
 
+    @property
+    def max_chunked_encoding_error(self):
+        return self.__max_chunked_encoding_error
+
+    @max_chunked_encoding_error.setter
+    def max_chunked_encoding_error(self, max_chunked_encoding_error):
+        if max_chunked_encoding_error < 1:
+            self.__max_chunked_encoding_error = 1
+        else:
+            self.__max_chunked_encoding_error = max_chunked_encoding_error
+
     def scrape(self, url):
         self.delay()
         source = self.get_source(url)
@@ -118,7 +131,7 @@ class Scrapper(event.Subject):
                 with requests.get(url, timeout=self.timeout) as source:
                     source.encoding = 'utf-8'
                     self.reset_error_counters('connect_timeout_counter', 'read_timeout_counter',
-                                              'connection_error_counter')
+                                              'connection_error_counter', 'chunked_encoding_error_counter')
                     return BeautifulSoup(source.text, features="html.parser")
             except requests.exceptions.ConnectTimeout:
                 self.handle_connect_timeout()
@@ -128,6 +141,8 @@ class Scrapper(event.Subject):
                 self.handle_ssl_error(url)
             except requests.ConnectionError:
                 self.handle_connection_error()
+            except requests.exceptions.ChunkedEncodingError:
+                self.handle_chunked_encoding_error()
             except requests.exceptions.RequestException as e:
                 raise NormalScrappingException(f'Undefined requests error: {str(e)}')
 
@@ -158,6 +173,14 @@ class Scrapper(event.Subject):
             self.reset_error_counters('connection_error_counter')
             raise ConnectionErrorOccurred()
 
+    def handle_chunked_encoding_error(self):
+        self.chunked_encoding_error_counter += 1
+        self.chunked_encoding_error(f'{self.chunked_encoding_error_counter}/{self.max_chunked_encoding_error}')
+
+        if self.connection_error_counter >= self.max_connection_error:
+            self.reset_error_counters('chunked_encoding_error_counter')
+            raise ChunkedEncodingError()
+
     def reset_error_counters(self, *args):
         for counter_name in args:
             try:
@@ -177,6 +200,10 @@ class Scrapper(event.Subject):
 
     @event.signal
     def connection_error(self, error_info):
+        pass
+
+    @event.signal
+    def chunked_encoding_error(self, error_info):
         pass
 
 
@@ -331,7 +358,8 @@ class StealthScrapper(Scrapper):
                 with session.get(url, timeout=self.timeout) as source:
                     source.encoding = 'utf-8'
                     self.reset_error_counters('connect_timeout_counter', 'read_timeout_counter',
-                                              'connection_error_counter', 'proxy_ssl_error_counter')
+                                              'connection_error_counter', 'proxy_ssl_error_counter',
+                                              'chunked_encoding_error_counter')
                     return BeautifulSoup(source.text, features="html.parser")
             except requests.exceptions.ConnectTimeout:
                 self.handle_connect_timeout(session, protocol)
@@ -345,6 +373,8 @@ class StealthScrapper(Scrapper):
                 self.handle_ssl_error(url, session, protocol)
             except requests.exceptions.ConnectionError:
                 self.handle_connection_error(session, protocol)
+            except requests.exceptions.ChunkedEncodingError:
+                self.handle_chunked_encoding_error(session, protocol)
             except requests.exceptions.RequestException as e:
                 raise StealthScrappingException(f'Undefined requests error: {str(e)}')
 
@@ -355,7 +385,7 @@ class StealthScrapper(Scrapper):
 
         if self.connect_timeout_counter >= self.max_connect_timeout:
             self.reset_error_counters('connect_timeout_counter', 'read_timeout_counter', 'connection_error_counter',
-                                      'proxy_ssl_error_counter')
+                                      'proxy_ssl_error_counter', 'chunked_encoding_error_counter')
             self.remove_proxy(self.used_proxy_index)
             session.proxies = self.draw_proxy(protocol)
 
@@ -363,14 +393,14 @@ class StealthScrapper(Scrapper):
         self.proxy_error(str(self.proxy[self.used_proxy_index]))
         self.remove_proxy(self.used_proxy_index)
         self.reset_error_counters('connect_timeout_counter', 'read_timeout_counter', 'connection_error_counter',
-                                  'proxy_ssl_error_counter')
+                                  'proxy_ssl_error_counter', 'chunked_encoding_error_counter')
         session.proxies = self.draw_proxy(protocol)
 
     def handle_invalid_header(self, session):
         self.invalid_user_agent(self.user_agents[self.used_user_agent_index])
         self.remove_user_agent(self.used_user_agent_index)
         self.reset_error_counters('connect_timeout_counter', 'read_timeout_counter', 'connection_error_counter',
-                                  'proxy_ssl_error_counter')
+                                  'proxy_ssl_error_counter', 'chunked_encoding_error_counter')
         session.headers = self.draw_user_agent()
 
     def handle_read_timeout(self, session, protocol):
@@ -379,10 +409,11 @@ class StealthScrapper(Scrapper):
 
         if self.read_timeout_counter >= self.max_read_timeout:
             self.reset_error_counters('connect_timeout_counter', 'read_timeout_counter', 'connection_error_counter',
-                                      'proxy_ssl_error_counter')
+                                      'proxy_ssl_error_counter', 'chunked_encoding_error_counter')
             raise ProxyReadTimeout()
 
-        self.reset_error_counters('connect_timeout_counter', 'connection_error_counter', 'proxy_ssl_error_counter')
+        self.reset_error_counters('connect_timeout_counter', 'connection_error_counter', 'proxy_ssl_error_counter',
+                                  'chunked_encoding_error_counter')
         self.remove_proxy(self.used_proxy_index)
         session.proxies = self.draw_proxy(protocol)
 
@@ -393,10 +424,11 @@ class StealthScrapper(Scrapper):
 
         if self.proxy_ssl_error_counter >= self.max_proxy_ssl_error:
             self.reset_error_counters('connect_timeout_counter', 'read_timeout_counter', 'connection_error_counter',
-                                      'proxy_ssl_error_counter')
+                                      'proxy_ssl_error_counter', 'chunked_encoding_error_counter')
             raise ProxySSLError()
 
-        self.reset_error_counters('connect_timeout_counter', 'read_timeout_counter', 'connection_error_counter')
+        self.reset_error_counters('connect_timeout_counter', 'read_timeout_counter', 'connection_error_counter',
+                                  'chunked_encoding_error_counter')
         self.remove_proxy(self.used_proxy_index)
         session.proxies = self.draw_proxy(protocol)
 
@@ -406,11 +438,25 @@ class StealthScrapper(Scrapper):
 
         if self.connection_error_counter >= self.max_connection_error:
             self.reset_error_counters('connect_timeout_counter', 'read_timeout_counter', 'connection_error_counter',
-                                      'proxy_ssl_error_counter')
+                                      'proxy_ssl_error_counter', 'chunked_encoding_error_counter')
             raise ProxyConnectionError()
 
-        self.reset_error_counters('connect_timeout_counter', 'read_timeout_counter', 'proxy_ssl_error_counter')
+        self.reset_error_counters('connect_timeout_counter', 'read_timeout_counter', 'proxy_ssl_error_counter',
+                                  'chunked_encoding_error_counter')
         self.remove_proxy(self.used_proxy_index)
+        session.proxies = self.draw_proxy(protocol)
+
+    def handle_chunked_encoding_error(self, session, protocol):
+        self.chunked_encoding_error_counter += 1
+        self.proxy_chunked_encoding_error(f'{self.chunked_encoding_error_counter}/{self.max_chunked_encoding_error}')
+
+        if self.chunked_encoding_error_counter >= self.max_chunked_encoding_error:
+            self.reset_error_counters('connect_timeout_counter', 'read_timeout_counter', 'connection_error_counter',
+                                      'proxy_ssl_error_counter', 'chunked_encoding_error_counter')
+            raise ProxyChunkedEncodingError()
+
+        self.reset_error_counters('connect_timeout_counter', 'read_timeout_counter', 'proxy_ssl_error_counter',
+                                  'connection_error_counter')
         session.proxies = self.draw_proxy(protocol)
 
     def remove_proxy(self, index):
@@ -453,6 +499,10 @@ class StealthScrapper(Scrapper):
 
     @event.signal
     def proxy_connection_error(self, info):
+        pass
+
+    @event.signal
+    def proxy_chunked_encoding_error(self, info):
         pass
 
     @event.signal
@@ -535,6 +585,10 @@ class ConnectionErrorOccurred(NormalScrappingException):
     pass
 
 
+class ChunkedEncodingError(NormalScrappingException):
+    pass
+
+
 class SSLError(NormalScrappingException):
     pass
 
@@ -548,6 +602,10 @@ class ProxySSLError(StealthScrappingException):
 
 
 class ProxyConnectionError(StealthScrappingException):
+    pass
+
+
+class ProxyChunkedEncodingError(StealthScrappingException):
     pass
 
 
