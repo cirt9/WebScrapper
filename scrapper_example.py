@@ -31,6 +31,9 @@ class ScrapperLogger:
     def on_connection_error(self, error_info):
         self.logger.warning(f'Connection error: {error_info}')
 
+    def on_chunked_encoding_error(self, error_info):
+        self.logger.warning(f'Chunked encoding error: {error_info}')
+
     def on_proxy_connect_timeout(self, proxy_info):
         self.logger.warning(f'Proxy connect timeout: {proxy_info}')
 
@@ -49,6 +52,9 @@ class ScrapperLogger:
     def on_proxy_connection_error(self, info):
         self.logger.warning(f'Proxy connection error: {info}')
 
+    def on_proxy_chunked_encoding_error(self, info):
+        self.logger.warning(f'Proxy chunked encoding error: {info}')
+
     def on_proxy_exhausted(self):
         self.logger.warning('Proxy exhausted')
 
@@ -63,6 +69,7 @@ def main():
     event.connect(scrapper, scrapper.connect_timeout, logger.on_connect_timeout)
     event.connect(scrapper, scrapper.read_timeout, logger.on_read_timeout)
     event.connect(scrapper, scrapper.connection_error, logger.on_connection_error)
+    event.connect(scrapper, scrapper.chunked_encoding_error, logger.on_chunked_encoding_error)
 
     event.connect(scrapper, scrapper.proxy_connect_timeout, logger.on_proxy_connect_timeout)
     event.connect(scrapper, scrapper.proxy_error, logger.on_proxy_error)
@@ -70,6 +77,7 @@ def main():
     event.connect(scrapper, scrapper.proxy_read_timeout, logger.on_proxy_read_timeout)
     event.connect(scrapper, scrapper.proxy_ssl_error, logger.on_proxy_ssl_error)
     event.connect(scrapper, scrapper.proxy_connection_error, logger.on_proxy_connection_error)
+    event.connect(scrapper, scrapper.proxy_chunked_encoding_error, logger.on_proxy_chunked_encoding_error)
     event.connect(scrapper, scrapper.proxy_exhausted, logger.on_proxy_exhausted)
     event.connect(scrapper, scrapper.user_agents_exhausted, logger.on_user_agents_exhausted)
 
