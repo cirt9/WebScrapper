@@ -532,7 +532,7 @@ class Proxy:
         return f'{self.protocol}://{self.ip}:{self.port}'
 
     def address(self):
-        return f'{self.ip}:{self.port}'
+        return f'{self.protocol}://{self.ip}:{self.port}'
 
     @staticmethod
     def is_valid(protocol, ip, port):
