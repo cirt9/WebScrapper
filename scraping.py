@@ -144,7 +144,7 @@ class Scrapper(event.Subject):
             except requests.exceptions.ChunkedEncodingError:
                 self.handle_chunked_encoding_error()
             except requests.exceptions.RequestException as e:
-                raise NormalScrappingException(f'Undefined requests error: {str(e)}')
+                raise NormalScrapingException(f'Undefined requests error: {str(e)}')
 
     def handle_connect_timeout(self):
         self.connect_timeout_counter += 1
@@ -292,10 +292,10 @@ class StealthScrapper(Scrapper):
         try:
             self.extract_proxy_from_source(proxy_source)
         except Exception as e:
-            raise ProxyScrappingError(debug.debug_info(repr(e)))
+            raise ProxyScrapingError(debug.debug_info(repr(e)))
 
         if len(self.proxy) == 0:
-            raise ProxyScrappingError(debug.debug_info('Proxy list is empty'))
+            raise ProxyScrapingError(debug.debug_info('Proxy list is empty'))
 
     def extract_proxy_from_source(self, proxy_source):
         for item in proxy_source.select('tbody tr'):
@@ -376,7 +376,7 @@ class StealthScrapper(Scrapper):
             except requests.exceptions.ChunkedEncodingError:
                 self.handle_chunked_encoding_error(session, protocol)
             except requests.exceptions.RequestException as e:
-                raise StealthScrappingException(f'Undefined requests error: {str(e)}')
+                raise StealthScrapingException(f'Undefined requests error: {str(e)}')
 
     def handle_connect_timeout(self, session, protocol):
         self.connect_timeout_counter += 1
@@ -561,61 +561,61 @@ class Proxy:
         return False
 
 
-class ScrappingException(Exception):
+class ScrapingException(Exception):
     pass
 
 
-class NormalScrappingException(ScrappingException):
+class NormalScrapingException(ScrapingException):
     pass
 
 
-class StealthScrappingException(ScrappingException):
+class StealthScrapingException(ScrapingException):
     pass
 
 
-class ConnectTimeout(NormalScrappingException):
+class ConnectTimeout(NormalScrapingException):
     pass
 
 
-class ReadTimeout(NormalScrappingException):
+class ReadTimeout(NormalScrapingException):
     pass
 
 
-class ConnectionErrorOccurred(NormalScrappingException):
+class ConnectionErrorOccurred(NormalScrapingException):
     pass
 
 
-class ChunkedEncodingError(NormalScrappingException):
+class ChunkedEncodingError(NormalScrapingException):
     pass
 
 
-class SSLError(NormalScrappingException):
+class SSLError(NormalScrapingException):
     pass
 
 
-class ProxyReadTimeout(StealthScrappingException):
+class ProxyReadTimeout(StealthScrapingException):
     pass
 
 
-class ProxySSLError(StealthScrappingException):
+class ProxySSLError(StealthScrapingException):
     pass
 
 
-class ProxyConnectionError(StealthScrappingException):
+class ProxyConnectionError(StealthScrapingException):
     pass
 
 
-class ProxyChunkedEncodingError(StealthScrappingException):
+class ProxyChunkedEncodingError(StealthScrapingException):
     pass
 
 
-class LackOfProxy(StealthScrappingException):
+class LackOfProxy(StealthScrapingException):
     pass
 
 
-class LackOfUserAgents(StealthScrappingException):
+class LackOfUserAgents(StealthScrapingException):
     pass
 
 
-class ProxyScrappingError(StealthScrappingException):
+class ProxyScrapingError(StealthScrapingException):
     pass
