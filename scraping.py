@@ -386,12 +386,12 @@ class StealthScrapper(Scrapper):
         if self.connect_timeout_counter >= self.max_connect_timeout:
             self.reset_error_counters('connect_timeout_counter', 'read_timeout_counter', 'connection_error_counter',
                                       'proxy_ssl_error_counter', 'chunked_encoding_error_counter')
-            self.remove_proxy(self.used_proxy_index)
+            self.remove_proxy(self.used_proxy_index, protocol)
             session.proxies = self.draw_proxy(protocol)
 
     def handle_proxy_error(self, session, protocol):
         self.proxy_error(str(self.proxy[self.used_proxy_index]))
-        self.remove_proxy(self.used_proxy_index)
+        self.remove_proxy(self.used_proxy_index, protocol)
         self.reset_error_counters('connect_timeout_counter', 'read_timeout_counter', 'connection_error_counter',
                                   'proxy_ssl_error_counter', 'chunked_encoding_error_counter')
         session.proxies = self.draw_proxy(protocol)
@@ -414,7 +414,7 @@ class StealthScrapper(Scrapper):
 
         self.reset_error_counters('connect_timeout_counter', 'connection_error_counter', 'proxy_ssl_error_counter',
                                   'chunked_encoding_error_counter')
-        self.remove_proxy(self.used_proxy_index)
+        self.remove_proxy(self.used_proxy_index, protocol)
         session.proxies = self.draw_proxy(protocol)
 
     def handle_ssl_error(self, url, session, protocol):
@@ -429,7 +429,7 @@ class StealthScrapper(Scrapper):
 
         self.reset_error_counters('connect_timeout_counter', 'read_timeout_counter', 'connection_error_counter',
                                   'chunked_encoding_error_counter')
-        self.remove_proxy(self.used_proxy_index)
+        self.remove_proxy(self.used_proxy_index, protocol)
         session.proxies = self.draw_proxy(protocol)
 
     def handle_connection_error(self, session, protocol):
@@ -443,7 +443,7 @@ class StealthScrapper(Scrapper):
 
         self.reset_error_counters('connect_timeout_counter', 'read_timeout_counter', 'proxy_ssl_error_counter',
                                   'chunked_encoding_error_counter')
-        self.remove_proxy(self.used_proxy_index)
+        self.remove_proxy(self.used_proxy_index, protocol)
         session.proxies = self.draw_proxy(protocol)
 
     def handle_chunked_encoding_error(self, session, protocol):
@@ -459,14 +459,14 @@ class StealthScrapper(Scrapper):
                                   'connection_error_counter')
         session.proxies = self.draw_proxy(protocol)
 
-    def remove_proxy(self, index):
+    def remove_proxy(self, index, protocol):
         del self.proxy[index]
 
         if index == self.used_proxy_index:
             self.used_proxy_index = StealthScrapper.WRONG_INDEX
 
-        if len(self.proxy) == 0:
-            self.proxy_exhausted()
+        if len([proxy for proxy in self.proxy if proxy.protocol == protocol]) == 0:
+            self.proxy_exhausted(protocol)
 
     def remove_user_agent(self, index):
         del self.user_agents[index]
@@ -506,7 +506,7 @@ class StealthScrapper(Scrapper):
         pass
 
     @event.signal
-    def proxy_exhausted(self):
+    def proxy_exhausted(self, protocol):
         pass
 
     @event.signal
