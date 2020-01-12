@@ -1,7 +1,7 @@
 import logging
 import datetime
 
-import scrapping
+import scraping
 import event
 
 
@@ -63,7 +63,7 @@ class ScrapperLogger:
 
 
 def main():
-    scrapper = scrapping.StealthScrapper()
+    scrapper = scraping.StealthScrapper()
     logger = ScrapperLogger()
 
     event.connect(scrapper, scrapper.connect_timeout, logger.on_connect_timeout)
@@ -84,7 +84,7 @@ def main():
     try:
         source = scrapper.scrape(r'https://www.google.com/')
         print(source)
-    except scrapping.ScrappingException as exception:
+    except scraping.ScrapingException as exception:
         logger.log(f'Exception: {type(exception).__name__} ({str(exception)})', logging.CRITICAL)
 
 
