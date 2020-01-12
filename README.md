@@ -6,16 +6,17 @@ WebScrapper is a program developed in Python 3.7 which allows you to scrap a web
 -requests</br>
 
 
-# Scrapping
+# Scraping
 
 Using Scrapper is fairly straightforward. You just have to use scrape method with a url that you want to scrap. You can set your own minimum/maximum delay, timeout time, maximum ticks for connect timeout, read timeout or connection error. When connec timeout/read timeout/connection errors will exceed maximum ticks that you assigned for them, then you will be informed about this with exception.
 
-With StealthScrapper in default proxy is provided from the Internet, but you can change this by setting proxy_from_file parameter to True and provide proxy from files/proxy.txt. The format is like this:
+With StealthScrapper in default proxy is provided from the Internet, but you can change this by setting proxy_from_file parameter to True and provide proxy from files/proxy.txt. The format looks like this:
 
 protocol;ip;port</br>
 https;190.13.14.34;8080
 
-Proxy and user agent are changed every time when there is an error or when a scrapping was successfull. But when invoking scrape method you can invoke it like this: scrapper.scrape(url, False). Program will retain a proxy and a user agent from a previous scrapping process and won't change it if it isn't needed.
+Proxy and user agent are changed every time when there is an error or when a scraping was successfull. But when invoking scrape method,
+you can invoke it like this: scrapper.scrape(url, False). Program will retain a proxy and a user agent from a previous scraping process and won't change it if it isn't needed.
 
 
 # Event
