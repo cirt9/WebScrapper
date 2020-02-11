@@ -223,6 +223,7 @@ class StealthScrapper(Scrapper):
         self.user_agents = []
         self.max_proxy_ssl_error = 5
         self.proxy_ssl_error_counter = 0
+        self.change_stealth = True
 
     @property
     def max_proxy_ssl_error(self):
@@ -235,12 +236,12 @@ class StealthScrapper(Scrapper):
         else:
             self.__max_proxy_ssl_error = max_proxy_ssl_error
 
-    def scrape(self, url, change_stealth=True):
+    def scrape(self, url):
         self.renew_stealth()
 
         protocol = url[0:url.find(':')]
         session = requests.Session()
-        self.prepare_stealth_session(session, protocol, change_stealth)
+        self.prepare_stealth_session(session, protocol)
 
         self.delay()
         source = self.get_source(url, session, protocol)
@@ -314,8 +315,8 @@ class StealthScrapper(Scrapper):
             for line in user_agents_file.read().splitlines():
                 self.user_agents.append(line)
 
-    def prepare_stealth_session(self, session, protocol, change_stealth):
-        if change_stealth or self.stealth_change_required():
+    def prepare_stealth_session(self, session, protocol):
+        if self.change_stealth or self.stealth_change_required():
             self.draw_proxy(protocol)
             self.draw_user_agent()
 
