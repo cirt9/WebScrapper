@@ -1,4 +1,5 @@
 import functools
+from inspect import signature
 
 
 def connect(subject, event_signal, observer):
@@ -83,11 +84,28 @@ class Event:
 
     def execute(self, signal_args, signal_kwargs):
         for observer in self.observers:
-            observer(*signal_args, **signal_kwargs)
+            observer_signature = signature(observer)
+            number_of_non_kw_parameters = len(observer_signature.parameters) - len(signal_kwargs)
+
+            if number_of_non_kw_parameters < 0:
+                raise MoreKwargsThanAccepted(f'Observer: "{observer.__name__}')
+
+            if len(signal_args) < number_of_non_kw_parameters:
+                raise TooMuchParametersInObserver(f'Observer: "{observer.__name__}')
+
+            observer(*signal_args[0:number_of_non_kw_parameters], **signal_kwargs)
 
     def clean_observers(self):
         self.observers[:] = [observer for observer in self.observers if observer is not None]
 
 
 class DuplicateObserver(Exception):
+    pass
+
+
+class TooMuchParametersInObserver(Exception):
+    pass
+
+
+class MoreKwargsThanAccepted(Exception):
     pass
