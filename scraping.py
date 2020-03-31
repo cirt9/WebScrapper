@@ -69,8 +69,8 @@ class Scrapper(event.Subject):
 
     @max_connect_timeout.setter
     def max_connect_timeout(self, max_connect_timeout):
-        if max_connect_timeout < 0.1:
-            self.__max_connect_timeout = 0.1
+        if max_connect_timeout < 1:
+            self.__max_connect_timeout = 1
         else:
             self.__max_connect_timeout = max_connect_timeout
 
@@ -156,7 +156,7 @@ class Scrapper(event.Subject):
 
     def handle_read_timeout(self):
         self.read_timeout_counter += 1
-        self.connect_timeout(f'{self.read_timeout_counter}/{self.max_read_timeout}')
+        self.read_timeout(f'{self.read_timeout_counter}/{self.max_read_timeout}')
 
         if self.read_timeout_counter >= self.max_read_timeout:
             self.reset_error_counters('read_timeout_counter')
